@@ -1,81 +1,128 @@
 import React, { useRef } from "react";
-import "./App.css";
 import * as tf from "@tensorflow/tfjs";
+import * as bodyPix from "@tensorflow-models/body-pix";
 import Webcam from "react-webcam";
-import { drawMesh } from "./meshUtilities.js";
-import * as faceLandmarksDetection from '@tensorflow-models/face-landmarks-detection'
+import "./App.css";
 
-const App = () => {
-  const webcamReference = useRef(null);
-  const canvasReference = useRef(null);
+function App() {
+  const webcamRef = useRef(null);
+  const canvasRef = useRef(null);
 
-  const loadFacemesh = async () => {
-    const model = await faceLandmarksDetection.load(faceLandmarksDetection.SupportedPackages.mediapipeFacemesh)
+  const runBodysegment = async () => {
+    const net = await bodyPix.load();
     setInterval(() => {
-      detectFace(model);
-    }, 150);
+      detect(net);
+    }, 100);
   };
 
-  const detectFace = async (model) => {
+  const detect = async (net) => {
     if (
-      typeof webcamReference.current !== "undefined" &&
-      webcamReference.current !== null &&
-      webcamReference.current.video.readyState === 4
+      typeof webcamRef.current !== "undefined" &&
+      webcamRef.current !== null &&
+      webcamRef.current.video.readyState === 4
     ) {
-      const video = webcamReference.current.video;
-      const videoWidth = webcamReference.current.video.videoWidth;
-      const videoHeight = webcamReference.current.video.videoHeight;
-      canvasReference.current.width = videoWidth;
-      canvasReference.current.height = videoHeight;
-      await model.estimateFaces({input: video}).then(predictions => {
-        console.log({predictions})
-        for (let i = 0; i < predictions.length; i++) {
-          const keypoints = predictions[i].scaledMesh
-          for (let i = 0; i < keypoints.length; i++) {
-            const [x, y, z] = keypoints[i]
-    
-            console.log(`Keypoint ${i}: [${x}, ${y}, ${z}]`)
+      const video = webcamRef.current.video;
+      const videoWidth = webcamRef.current.video.videoWidth;
+      const videoHeight = webcamRef.current.video.videoHeight;
+
+      webcamRef.current.video.width = videoWidth;
+      webcamRef.current.video.height = videoHeight;
+
+      canvasRef.current.width = videoWidth;
+      canvasRef.current.height = videoHeight;
+
+      let person = await net.segmentPersonParts(video);
+      let targetSegmentation = person;
+
+      targetSegmentation.data = person.data.map(val => {
+        if (val !== 0 && val !== 1)
+            return -1;
+        else
+            return val;
+      });
+
+      const faceThreshold = 0.9;
+      const touchThreshold = 0.01;
+
+      // const coloredPartImage = bodyPix.toMask(person);
+      const coloredPartImage = bodyPix.toColoredPartMask(targetSegmentation);
+      const opacity = 0.7;
+      const flipHorizontal = false;
+      const maskBlurAmount = 0;
+      const canvas = canvasRef.current;
+
+      if(targetSegmentation.allPoses[0] !== undefined){
+        let data = undefined
+        data = {
+          'Nose':{
+            'X': targetSegmentation.allPoses[0].keypoints[0].position.x,
+            'Y': targetSegmentation.allPoses[0].keypoints[0].position.y
+          },
+          'LeftEye':{
+            'X': targetSegmentation.allPoses[0].keypoints[1].position.x,
+            'Y': targetSegmentation.allPoses[0].keypoints[1].position.y
+          },
+          'RigthEye':{
+            'X': targetSegmentation.allPoses[0].keypoints[2].position.x,
+            'Y': targetSegmentation.allPoses[0].keypoints[2].position.y
+          },
+          'LeftEar':{
+            'X': targetSegmentation.allPoses[0].keypoints[3].position.x,
+            'Y': targetSegmentation.allPoses[0].keypoints[3].position.y
+          },
+          'RigthEar':{
+            'X': targetSegmentation.allPoses[0].keypoints[4].position.x,
+            'Y': targetSegmentation.allPoses[0].keypoints[4].position.y
           }
         }
-        const ctx = canvasReference.current.getContext("2d");
-        drawMesh(predictions, ctx);
-      })
+      }
+      
+      bodyPix.drawMask(
+        canvas,
+        video,
+        coloredPartImage,
+        opacity,
+        maskBlurAmount,
+        flipHorizontal
+      );
     }
   };
 
-  loadFacemesh();
+  runBodysegment();
 
   return (
     <div className="App">
-      <Webcam
-        ref={webcamReference}
-        style={{
-          position: "absolute",
-          marginLeft: "auto",
-          marginRight: "auto",
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          zindex: 9,
-          width: 720,
-          height: 500
-        }}
-      />
+      <header className="App-header">
+        <Webcam
+          ref={webcamRef}
+          style={{
+            position: "absolute",
+            marginLeft: "auto",
+            marginRight: "auto",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            zindex: 9,
+            width: 640,
+            height: 480,
+          }}
+        />
 
-      <canvas
-        ref={canvasReference}
-        style={{
-          position: "absolute",
-          marginLeft: "auto",
-          marginRight: "auto",
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          zindex: 9,
-          width: 720,
-          height: 500
-        }}
-      />
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            marginLeft: "auto",
+            marginRight: "auto",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+            zindex: 9,
+            width: 640,
+            height: 480,
+          }}
+        />
+      </header>
     </div>
   );
 }
