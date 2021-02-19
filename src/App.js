@@ -4,7 +4,7 @@ import * as bodyPix from "@tensorflow-models/body-pix";
 import Webcam from "react-webcam";
 import "./App.css";
 
-function App() {
+const App = () =>{
   const webcamRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -12,9 +12,8 @@ function App() {
     const net = await bodyPix.load();
     setInterval(() => {
       detect(net);
-    }, 100);
+    }, 200);
   };
-
   const detect = async (net) => {
     if (
       typeof webcamRef.current !== "undefined" &&
@@ -35,47 +34,33 @@ function App() {
       let targetSegmentation = person;
 
       targetSegmentation.data = person.data.map(val => {
-        if (val !== 0 && val !== 1)
-            return -1;
-        else
-            return val;
+        if (val !== 0 && val !== 1) return -1
+        else return val
       });
 
-      const faceThreshold = 0.9;
-      const touchThreshold = 0.01;
-
-      // const coloredPartImage = bodyPix.toMask(person);
       const coloredPartImage = bodyPix.toColoredPartMask(targetSegmentation);
       const opacity = 0.7;
       const flipHorizontal = false;
       const maskBlurAmount = 0;
       const canvas = canvasRef.current;
 
-      if(targetSegmentation.allPoses[0] !== undefined){
-        let data = undefined
-        data = {
-          'Nose':{
-            'X': targetSegmentation.allPoses[0].keypoints[0].position.x,
-            'Y': targetSegmentation.allPoses[0].keypoints[0].position.y
-          },
-          'LeftEye':{
-            'X': targetSegmentation.allPoses[0].keypoints[1].position.x,
-            'Y': targetSegmentation.allPoses[0].keypoints[1].position.y
-          },
-          'RigthEye':{
-            'X': targetSegmentation.allPoses[0].keypoints[2].position.x,
-            'Y': targetSegmentation.allPoses[0].keypoints[2].position.y
-          },
-          'LeftEar':{
-            'X': targetSegmentation.allPoses[0].keypoints[3].position.x,
-            'Y': targetSegmentation.allPoses[0].keypoints[3].position.y
-          },
-          'RigthEar':{
-            'X': targetSegmentation.allPoses[0].keypoints[4].position.x,
-            'Y': targetSegmentation.allPoses[0].keypoints[4].position.y
+        if(targetSegmentation.allPoses[0] !== undefined){
+          let data = {
+            'nose':{
+              'X': targetSegmentation.allPoses[0].keypoints[0].position.x,
+              'Y': targetSegmentation.allPoses[0].keypoints[0].position.y
+            },
+            'leftEye':{
+              'X': targetSegmentation.allPoses[0].keypoints[1].position.x,
+              'Y': targetSegmentation.allPoses[0].keypoints[1].position.y,
+            },
+            'rightEye':{
+              'X': targetSegmentation.allPoses[0].keypoints[2].position.x,
+              'Y': targetSegmentation.allPoses[0].keypoints[2].position.y
+            }
           }
+          console.log(data)
         }
-      }
       
       bodyPix.drawMask(
         canvas,
